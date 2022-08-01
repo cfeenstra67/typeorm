@@ -160,7 +160,8 @@
     "sql.js": "^1.4.0",
     "sqlite3": "^5.0.3",
     "ts-node": "^10.7.0",
-    "typeorm-aurora-data-api-driver": "^2.0.0"
+    "typeorm-aurora-data-api-driver": "^2.0.0",
+    "wa-sqlite": "file:../wa-sqlite"
   },
   "peerDependenciesMeta": {
     "@google-cloud/spanner": {
