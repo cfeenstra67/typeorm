@@ -44,10 +44,6 @@ export class WaSqliteQueryRunner extends AbstractSqliteQueryRunner {
         await this.query(`PRAGMA foreign_keys = ON`)
     }
 
-    async release(): Promise<void> {
-        return super.release()
-    }
-
     /**
      * Executes a given SQL query.
      */
@@ -59,16 +55,19 @@ export class WaSqliteQueryRunner extends AbstractSqliteQueryRunner {
         if (this.isReleased) throw new QueryRunnerAlreadyReleasedError()
 
         const databaseConnection = this.driver.databaseConnection
-        const sqlite3 = this.driver.sqlite3
+        const sqlite3 = await this.driver.sqlite3Promise
         const SQLite = this.driver.SQLite;
-        if (SQLite === undefined || sqlite3 === undefined) {
+        if (SQLite === undefined) {
             throw new DriverPackageNotInstalledError('wa-sqlite', 'wa-sqlite');
         }
 
         this.driver.connection.logger.logQuery(query, parameters, this)
         const queryStartTime = +new Date()
         let statement: any
+
         try {
+            const isInsert = query.startsWith('INSERT ')
+
             const queryStr = sqlite3.str_value(sqlite3.str_new(databaseConnection, query));
             statement = (await sqlite3.prepare_v2(
                 databaseConnection,
@@ -104,20 +103,29 @@ export class WaSqliteQueryRunner extends AbstractSqliteQueryRunner {
 
             while (await sqlite3.step(statement) === SQLite.SQLITE_ROW) {
                 const obj: any = {};
-                const row = sqlite3.row(statement);
+                const row = sqlite3.row(statement)
                 for (let i = 0; i < columnNames.length; i++) {
-                    obj[columnNames[i]] = row[i];
+                    obj[columnNames[i]] = row[i]
                 }
                 records.push(obj)
             }
 
-            const result = new QueryResult()
-
-            result.affected = sqlite3.changes(databaseConnection)
-            result.records = records
-            result.raw = records
+            const changes = sqlite3.changes(databaseConnection)
 
             await sqlite3.finalize(statement)
+            statement = undefined
+
+            if (isInsert) {
+                await sqlite3.exec(databaseConnection, `SELECT last_insert_rowid()`, (row, columns) => {
+                    records.push(row[0])
+                });
+            }
+
+            const result = new QueryResult()
+
+            result.affected = changes;
+            result.records = records
+            result.raw = records
 
             if (useStructuredResult) {
                 return result

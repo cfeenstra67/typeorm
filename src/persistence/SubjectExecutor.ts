@@ -425,7 +425,8 @@ export class SubjectExecutor {
                 // which is not same object as our entity that's why we don't need to worry about our entity to get dirty
                 // also, we disable listeners because we call them on our own in persistence layer
                 if (bulkInsertMaps.length > 0) {
-                    const insertResult = await this.queryRunner.manager
+
+                    const builder = this.queryRunner.manager
                         .createQueryBuilder()
                         .insert()
                         .into(subjects[0].metadata.target)
@@ -434,7 +435,9 @@ export class SubjectExecutor {
                             this.options && this.options.reload === false
                                 ? false
                                 : true,
-                        )
+                        );
+
+                    const insertResult = await builder
                         .callListeners(false)
                         .execute()
 

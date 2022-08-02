@@ -1,20 +1,24 @@
 import type * as SQLite from 'wa-sqlite';
 
-import { AbstractSqliteDriver } from "../sqlite-abstract/AbstractSqliteDriver"
-import { WaSqliteConnectionOptions } from "./WaSqliteConnectionOptions"
-import { WaSqliteQueryRunner } from "./WaSqliteQueryRunner"
-import { QueryRunner } from "../../query-runner/QueryRunner"
 import { DataSource } from "../../data-source/DataSource"
 import { DriverPackageNotInstalledError } from "../../error/DriverPackageNotInstalledError"
+import { QueryRunner } from "../../query-runner/QueryRunner"
+import { AbstractSqliteDriver } from "../sqlite-abstract/AbstractSqliteDriver"
+import { ColumnType } from "../types/ColumnTypes"
 import { ReplicationMode } from "../types/ReplicationMode"
+import { WaSqliteConnectionOptions } from "./WaSqliteConnectionOptions"
+import { WaSqliteModule, WaSqliteAsyncModule } from "./WaSqliteModule"
+import { WaSqliteQueryRunner } from "./WaSqliteQueryRunner"
 
 export class WaSqliteDriver extends AbstractSqliteDriver {
     // The driver specific options.
     options: WaSqliteConnectionOptions
 
-    sqlite3: SQLiteAPI | undefined;
 
     SQLite: typeof SQLite | undefined;
+
+    private readyPromise: Promise<void>
+    sqlite3Promise: Promise<SQLiteAPI>;
 
     // -------------------------------------------------------------------------
     // Constructor
@@ -23,6 +27,8 @@ export class WaSqliteDriver extends AbstractSqliteDriver {
     constructor(connection: DataSource) {
         super(connection)
 
+        this.readyPromise = Promise.resolve()
+        this.sqlite3Promise = Promise.reject(new Error('dependencies not loaded'))
         // load sqlite module
         this.loadDependencies()
     }
@@ -35,6 +41,7 @@ export class WaSqliteDriver extends AbstractSqliteDriver {
      * Performs connection to the database.
      */
     async connect(): Promise<void> {
+        await this.readyPromise
         this.databaseConnection = await this.createDatabaseConnection()
     }
 
@@ -43,7 +50,8 @@ export class WaSqliteDriver extends AbstractSqliteDriver {
      */
     async disconnect(): Promise<void> {
         this.queryRunner = undefined
-        await this.sqlite3?.close(this.databaseConnection);
+        const sqlite3 = await this.sqlite3Promise
+        await sqlite3.close(this.databaseConnection);
     }
 
     /**
@@ -55,39 +63,19 @@ export class WaSqliteDriver extends AbstractSqliteDriver {
         return this.queryRunner
     }
 
-    // /**
-    //  * Creates generated map of values generated or returned by database after INSERT query.
-    //  */
-    // createGeneratedMap(metadata: EntityMetadata, insertResult: any) {
-    //     const generatedMap = metadata.generatedColumns.reduce(
-    //         (map, generatedColumn) => {
-    //             // seems to be the only way to get the inserted id, see https://github.com/kripken/sql.js/issues/77
-    //             if (
-    //                 generatedColumn.isPrimary &&
-    //                 generatedColumn.generationStrategy === "increment"
-    //             ) {
-    //                 const query = "SELECT last_insert_rowid()"
-    //                 try {
-    //                     let result = this.databaseConnection.exec(query)
-    //                     this.connection.logger.logQuery(query)
-    //                     return OrmUtils.mergeDeep(
-    //                         map,
-    //                         generatedColumn.createValueMap(
-    //                             result[0].values[0][0],
-    //                         ),
-    //                     )
-    //                 } catch (e) {
-    //                     this.connection.logger.logQueryError(e, query, [])
-    //                 }
-    //             }
 
-    //             return map
-    //         },
-    //         {} as ObjectLiteral,
-    //     )
+    normalizeType(column: {
+        type?: ColumnType
+        length?: number | string
+        precision?: number | null
+        scale?: number
+    }): string {
+        if ((column.type as any) === Buffer) {
+            return "blob"
+        }
 
-    //     return Object.keys(generatedMap).length > 0 ? generatedMap : undefined
-    // }
+        return super.normalizeType(column)
+    }
 
     // -------------------------------------------------------------------------
     // Protected Methods
@@ -98,23 +86,30 @@ export class WaSqliteDriver extends AbstractSqliteDriver {
      * If the location option is set, the database is loaded first.
      */
     protected async createDatabaseConnection(): Promise<any> {
-        if (this.sqlite3 === undefined) {
-            throw new DriverPackageNotInstalledError('wa-sqlite', 'wa-sqlite');
-        }
-        this.databaseConnection = await this.sqlite3.open_v2(this.options.name);
-        await this.sqlite3.exec(this.databaseConnection, `PRAGMA foreign_keys = ON`)
+        const sqlite3 = await this.sqlite3Promise
+        this.databaseConnection = await sqlite3.open_v2(this.options.database);
+        await sqlite3.exec(this.databaseConnection, `PRAGMA foreign_keys = ON`)
         return this.databaseConnection;
     }
 
     /**
-     * Currently the driver is a required argument, so this is a no-op. It's being
-     * kept as it will be implemented in the future
+     * Load wa-sqlite package
      */
     protected loadDependencies(): void {
-        this.SQLite = require('wa-sqlite');
+        const SQLite = require('wa-sqlite')
+        this.SQLite = SQLite
         if (this.SQLite === undefined) {
             throw new DriverPackageNotInstalledError('wa-sqlite', 'wa-sqlite');
         }
-        this.sqlite3 = this.SQLite.Factory(this.options.module);
+        let mod = this.options.module;
+        if (mod === undefined) {
+            const factory = this.options.isAsync ? WaSqliteAsyncModule : WaSqliteModule
+            const { module: newMod, ready } = factory()
+            mod = newMod
+            this.readyPromise = ready
+        }
+        // Avoid this being raised as an unhandled rejection later
+        this.sqlite3Promise.catch(() => {})
+        this.sqlite3Promise = this.readyPromise.then(() => SQLite.Factory(mod))
     }
 }

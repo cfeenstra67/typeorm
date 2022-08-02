@@ -10,12 +10,18 @@ export interface WaSqliteConnectionOptions extends BaseDataSourceOptions {
     readonly type: "wa-sqlite"
 
     /**
-     * wa-sqlite driver
+     * wa-sqlite module
      */
-    readonly module: SQLiteModule;
+    readonly module?: SQLiteModule;
+
+    /**
+     * Specify whether you want to use the async wa-sqlite module
+     * rather than the sync one. If `module` is set, this is ignored.
+     */
+    readonly isAsync?: boolean;
 
     /**
      * Database name
      */
-    readonly name: string;
+    readonly database: string;
 }

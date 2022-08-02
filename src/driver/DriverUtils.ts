@@ -22,6 +22,7 @@ export class DriverUtils {
             "expo",
             "better-sqlite3",
             "capacitor",
+            "wa-sqlite",
         ].includes(driver.options.type)
     }
 
