@@ -1,3 +1,4 @@
+import { ObjectLiteral } from "../../common/ObjectLiteral"
 import { QueryRunnerAlreadyReleasedError } from "../../error/QueryRunnerAlreadyReleasedError"
 import { AbstractSqliteQueryRunner } from "../sqlite-abstract/AbstractSqliteQueryRunner"
 import { WaSqliteDriver } from "./WaSqliteDriver"
@@ -42,6 +43,44 @@ export class WaSqliteQueryRunner extends AbstractSqliteQueryRunner {
      */
     async afterMigration(): Promise<void> {
         await this.query(`PRAGMA foreign_keys = ON`)
+    }
+
+    /**
+     * Removes all tables from the currently connected database.
+     */
+    async clearDatabase(database?: string): Promise<void> {
+        await this.query(`PRAGMA foreign_keys = OFF`)
+
+        const isAnotherTransactionActive = this.isTransactionActive
+        if (!isAnotherTransactionActive) await this.startTransaction()
+        try {
+            const selectViewDropsQuery = `SELECT 'DROP VIEW "' || name || '";' as query FROM "sqlite_master" WHERE "type" = 'view'`
+            const dropViewQueries: ObjectLiteral[] = await this.query(
+                selectViewDropsQuery,
+            )
+            for (const q of dropViewQueries) {
+                await this.query(q["query"])
+            }
+
+            const selectTableDropsQuery = `SELECT 'DROP TABLE "' || name || '";' as query FROM "sqlite_master" WHERE "type" = 'table' AND "name" != 'sqlite_sequence'`
+            const dropTableQueries: ObjectLiteral[] = await this.query(
+                selectTableDropsQuery,
+            )
+            for (const q of dropTableQueries) {
+                await this.query(q["query"])
+            }
+
+            if (!isAnotherTransactionActive) await this.commitTransaction()
+        } catch (error) {
+            try {
+                // we throw original error even if rollback thrown an error
+                if (!isAnotherTransactionActive)
+                    await this.rollbackTransaction()
+            } catch (rollbackError) {}
+            throw error
+        } finally {
+            await this.query(`PRAGMA foreign_keys = ON`)
+        }
     }
 
     /**
