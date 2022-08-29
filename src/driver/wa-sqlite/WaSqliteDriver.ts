@@ -87,7 +87,11 @@ export class WaSqliteDriver extends AbstractSqliteDriver {
      */
     protected async createDatabaseConnection(): Promise<any> {
         const sqlite3 = await this.sqlite3Promise
-        this.databaseConnection = await sqlite3.open_v2(this.options.database);
+        this.databaseConnection = await sqlite3.open_v2(
+            this.options.database,
+            this.options.flags,
+            this.options.vfs,
+        );
         await sqlite3.exec(this.databaseConnection, `PRAGMA foreign_keys = ON`)
         return this.databaseConnection;
     }
@@ -101,15 +105,20 @@ export class WaSqliteDriver extends AbstractSqliteDriver {
         if (this.SQLite === undefined) {
             throw new DriverPackageNotInstalledError('wa-sqlite', 'wa-sqlite');
         }
-        let mod = this.options.module;
-        if (mod === undefined) {
-            const factory = this.options.isAsync ? WaSqliteAsyncModule : WaSqliteModule
-            const { module: newMod, ready } = factory()
-            mod = newMod
-            this.readyPromise = ready
-        }
         // Avoid this being raised as an unhandled rejection later
         this.sqlite3Promise.catch(() => {})
-        this.sqlite3Promise = this.readyPromise.then(() => SQLite.Factory(mod))
+        if (this.options.driver !== undefined) {
+            this.sqlite3Promise = Promise.resolve(this.options.driver);
+        } else {
+            let mod = this.options.module;
+            if (mod === undefined) {
+                const factory = this.options.async ? WaSqliteAsyncModule : WaSqliteModule
+                const { module: newMod, ready } = factory()
+                mod = newMod
+                this.readyPromise = ready
+            }
+
+            this.sqlite3Promise = this.readyPromise.then(() => SQLite.Factory(mod))
+        }
     }
 }

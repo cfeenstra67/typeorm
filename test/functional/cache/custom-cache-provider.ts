@@ -29,7 +29,7 @@ describe("custom cache provider", () => {
     it("should be used instead of built-ins", () =>
         Promise.all(
             connections.map(async (connection) => {
-                if (connection.driver.options.type === "spanner") {
+                if (["spanner", "wa-sqlite"].includes(connection.driver.options.type)) {
                     return
                 }
 
@@ -47,7 +47,7 @@ describe("custom cache provider", () => {
     it("should cache results properly", () =>
         Promise.all(
             connections.map(async (connection) => {
-                if (connection.driver.options.type === "spanner") {
+                if (["spanner", "wa-sqlite"].includes(connection.driver.options.type)) {
                     return
                 }
                 // first prepare data - insert users
@@ -115,7 +115,7 @@ describe("custom cache provider", () => {
     it("should cache results with pagination enabled properly", () =>
         Promise.all(
             connections.map(async (connection) => {
-                if (connection.driver.options.type === "spanner") {
+                if (["spanner", "wa-sqlite"].includes(connection.driver.options.type)) {
                     return
                 }
 
@@ -196,7 +196,7 @@ describe("custom cache provider", () => {
     it("should cache results with custom id and duration supplied", () =>
         Promise.all(
             connections.map(async (connection) => {
-                if (connection.driver.options.type === "spanner") {
+                if (["spanner", "wa-sqlite"].includes(connection.driver.options.type)) {
                     return
                 }
 
@@ -280,7 +280,7 @@ describe("custom cache provider", () => {
     it("should cache results with custom id and duration supplied", () =>
         Promise.all(
             connections.map(async (connection) => {
-                if (connection.driver.options.type === "spanner") {
+                if (["spanner", "wa-sqlite"].includes(connection.driver.options.type)) {
                     return
                 }
 

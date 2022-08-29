@@ -1,4 +1,7 @@
 {
+    "ts-node": {
+        "files": true
+    },
     "compilerOptions": {
         "lib": ["es5", "es6"],
         "outDir": "build/compiled",
@@ -24,7 +27,8 @@
     "include": [
       "sample",
       "src",
-      "test"
+      "test",
+      "*.ts"
     ],
     "exclude": [
         "tmp",
