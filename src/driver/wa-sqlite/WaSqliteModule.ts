@@ -1,6 +1,6 @@
 
 export interface WaSqliteModule {
-  module: SQLiteModule;
+  module: any;
   ready: Promise<void>;
 }
 
@@ -8,7 +8,7 @@ let syncModule: WaSqliteModule | undefined = undefined;
 
 export const WaSqliteModule: () => WaSqliteModule = () => {
   if (syncModule === undefined) {
-    const mod = require(`wa-sqlite/dist/wa-sqlite.js`)
+    const mod = require('wa-sqlite/dist/wa-sqlite.js')
     const ready = new Promise<void>((resolve) => {
       mod.postRun = () => resolve(undefined)
     })

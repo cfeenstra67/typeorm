@@ -12,7 +12,7 @@ export interface WaSqliteConnectionOptions extends BaseDataSourceOptions {
     /**
      * wa-sqlite module
      */
-    readonly module?: SQLiteModule;
+    readonly module?: any;
     /**
      * wa-sqlite driver, fully baked
      */

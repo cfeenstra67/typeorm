@@ -107,17 +107,17 @@ export class WaSqliteQueryRunner extends AbstractSqliteQueryRunner {
         try {
             const isInsert = query.startsWith('INSERT ')
 
-            const queryStr = sqlite3.str_value(sqlite3.str_new(databaseConnection, query));
-            statement = (await sqlite3.prepare_v2(
-                databaseConnection,
-                queryStr,
-            ))?.stmt
-            if (parameters) {
-                parameters = parameters.map((p) =>
-                    typeof p !== "undefined" ? p : null,
-                )
-
-                sqlite3.bind_collection(statement, parameters)
+            // const queryStr = sqlite3.str_value(sqlite3.str_new(databaseConnection, query));
+            for await (const stmt of sqlite3.statements(databaseConnection, query)) {
+                statement = stmt;
+                if (parameters) {
+                    parameters = parameters.map((p) =>
+                        typeof p !== "undefined" ? p : null,
+                    )
+    
+                    sqlite3.bind_collection(statement, parameters)
+                }
+                break;
             }
 
             // log slow queries if maxQueryExecution time is set
